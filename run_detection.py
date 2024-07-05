@@ -2,8 +2,6 @@ import torch
 from transformers import AutoTokenizer, AutoModel, AdamW, get_scheduler
 from transformers.models.bert.configuration_bert import BertConfig
 from dnabert_for_token_classification import BertForTokenClassification
-from Bio import SeqIO
-import random
 from datasets import load_metric
 from tqdm import tqdm
 from data_handling import MutationDetectionDataset
@@ -17,17 +15,22 @@ else:
     DEVICE = torch.device("cpu")
 
 
-def run_training(train_fasta_m, train_fasta_t, validation_fasta_m, validation_fasta_t,num_epochs=3):
+def run_training(train_fasta_m, train_fasta_t, validation_fasta_m, validation_fasta_t, num_epochs=1):
     # Load a pre-trained model and tokenizer
     config = BertConfig.from_pretrained("zhihan1996/DNABERT-2-117M")
     tokenizer = AutoTokenizer.from_pretrained("zhihan1996/DNABERT-2-117M", trust_remote_code=True)
     model = BertForTokenClassification(config, num_labels=1).to(DEVICE)
+    # in case we have two separate files for train and eval:
+    # train_dataset = MutationDetectionDataset(train_fasta_m, train_fasta_t, tokenizer, replacement_flag=True,
+    #                                          mutation_rate=0.01)
+    # eval_dataset = MutationDetectionDataset(validation_fasta_m, validation_fasta_t, tokenizer, replacement_flag=False)
 
-    train_dataset = MutationDetectionDataset(train_fasta_m, train_fasta_t, tokenizer, replacement_flag=True,
-                                             mutation_rate=0.01)
+    # in case we only have one file for both train and eval:
+    dataset = MutationDetectionDataset(train_fasta_m, train_fasta_t, tokenizer, replacement_flag=True,
+                                       mutation_rate=0.01)
+    train_dataset, eval_dataset = torch.utils.data.random_split(dataset, [0.8, 0.2], generator=None)
+
     train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-
-    eval_dataset = MutationDetectionDataset(validation_fasta_m, validation_fasta_t, tokenizer, replacement_flag=False)
     eval_dataloader = DataLoader(eval_dataset, batch_size=32, shuffle=True)
 
     # Prepare the data (example using Hugging Face datasets library)
@@ -76,19 +79,8 @@ def run_training(train_fasta_m, train_fasta_t, validation_fasta_m, validation_fa
 
             predictions = outputs.logits.argmax(dim=-1)
             labels = batch["labels"]
-
-            # Remove ignored index (special tokens) for evaluation
-            true_predictions = [
-                [label_list[p] for (p, l) in zip(prediction, label) if l != -100]
-                for prediction, label in zip(predictions, labels)
-            ]
-            true_labels = [
-                [label_list[l] for (p, l) in zip(prediction, label) if l != -100]
-                for prediction, label in zip(predictions, labels)
-            ]
-
-            metric.add_batch(predictions=true_predictions, references=true_labels)
-
+            metric.add_batch(predictions=predictions, references=labels)
+        # TODO make sure I ignore start, end and padding tokens in the metric
         results = metric.compute()
         print(f"Epoch {epoch + 1}: {results}")
 
@@ -96,7 +88,8 @@ def run_training(train_fasta_m, train_fasta_t, validation_fasta_m, validation_fa
     model.save_pretrained("path_to_save_model")
 
 
-
 if __name__ == "__main__":
     print(f'device is: {DEVICE}')
-    run_training()
+    train_fasta_m = '/sci/labs/morani/morani/icore-data/lab/Data/BacterialGenes/head_humanGut_IGC.11M.nucleotide.fa'
+    train_fasta_t = train_fasta_m
+    run_training(train_fasta_m, train_fasta_t, None, None, num_epochs=1)

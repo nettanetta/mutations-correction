@@ -1,16 +1,19 @@
 from torch.utils.data import Dataset, DataLoader
 from Bio import SeqIO
 import random
+
+
 def insert_single_replacement(seq, mutation_rate):
     new_seq = []
-    mutation_added=False
+    mutation_added = False
     for c in seq:
-        if mutation_added==False and random.random() < mutation_rate:
+        if mutation_added == False and random.random() < mutation_rate:
             choice_str = list({'A', 'C', 'G', 'T'} - {c})
             new_seq.append(random.choice(choice_str))
         else:
             new_seq.append(c)
     return ''.join(new_seq)
+
 
 def get_onehot_for_first_missmatch(seq1, seq2):
     for index, (a, b) in enumerate(zip(seq1, seq2)):
@@ -37,8 +40,8 @@ class MutationDetectionDataset(Dataset):
                 x = insert_single_replacement(record_m.seq, mutation_rate=mutation_rate)
             else:
                 x = record_m.seq
-            tokenized_x = tokenization_f(x)
-            tokenized_y = tokenization_f(record_t.seq)
+            tokenized_x = tokenization_f(str(x))
+            tokenized_y = tokenization_f(str(record_t.seq))
             self.sequences.append(tokenized_x)
             self.tokens_labels.append(get_onehot_for_first_missmatch(tokenized_x, tokenized_y))
 
