@@ -65,7 +65,7 @@ class BertForTokenClassification(BertPreTrainedModel):
         if labels is not None:
             # Compute loss
             loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+            loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1, self.num_labels).float()) # TODO do we want to keep the default mean reduction?
 
         if not return_dict:
             output = (logits,) + outputs[2:]

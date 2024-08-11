@@ -7,8 +7,9 @@ the code is not running properly because of environment issues. but this should 
 1. You need to create a conda env based on this mutation_correction_env.yml 
 2. to run the code on the cluster, start with creating an interactive run with GPUs:
     srun --gres=gpu:a5000 --mem=1G --pty $SHELL
-3. conda activate mutation_correction_env
+3. conda activate mutation_correction_env_1
 4. module load cuda/11.8 
 5. module load nvidia
 6. python3 run_detection.py
 
+dnabert2_python38 worked for running compare_token_sequences.py
