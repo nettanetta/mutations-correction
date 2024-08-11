@@ -1,18 +1,27 @@
 import torch
-from transformers import AutoTokenizer, AutoModel, AdamW, get_scheduler
+from transformers import AdamW, get_scheduler, AutoTokenizer
 from transformers.models.bert.configuration_bert import BertConfig
 from dnabert_for_token_classification import BertForTokenClassification
 import evaluate
 from tqdm import tqdm
-from data_handling import MutationDetectionDataset
+from data_handling import MutationDetectionDataset, get_one_hot_encoded_detection_labels
 from torch.utils.data import DataLoader
 
-BATCH_SIZE = 1024
-
+BATCH_SIZE = 32
+MAX_LEN = 512
 if torch.cuda.is_available():
     DEVICE = torch.device("cuda")
 else:
     DEVICE = torch.device("cpu")
+
+
+def model_outputs_from_batch(batch, model, device, tokenizer):
+    tokenized_x = tokenizer(batch['mutated_seqs'], padding=True, truncation=True, max_length=MAX_LEN,
+                            return_tensors='pt').to(device)
+    tokenized_y = tokenizer(batch['orig_seqs'], padding=True, truncation=True, max_length=MAX_LEN,
+                            return_tensors='pt').to(device)
+    labels = get_one_hot_encoded_detection_labels(tokenized_x, tokenized_y)
+    return model(input_ids=tokenized_x['input_ids'], labels=labels), labels
 
 
 def run_training(train_fasta_m, train_fasta_t, validation_fasta_m, validation_fasta_t, num_epochs=1):
@@ -60,9 +69,7 @@ def run_training(train_fasta_m, train_fasta_t, validation_fasta_m, validation_fa
         # Training
         model.train()
         for batch in tqdm(train_dataloader, desc=f"Training Epoch {epoch + 1}"):
-            batch = {k: v.to(device) for k, v in batch.items()}
-            # print(batch.keys())
-            outputs = model(**batch)
+            outputs,_ = model_outputs_from_batch(batch, model, device, tokenizer)
             loss = outputs.loss
             loss.backward()
 
@@ -73,21 +80,20 @@ def run_training(train_fasta_m, train_fasta_t, validation_fasta_m, validation_fa
         # Evaluation
         model.eval()
         for batch in tqdm(eval_dataloader, desc=f"Evaluating Epoch {epoch + 1}"):
-            batch = {k: v.to(device) for k, v in batch.items()}
             with torch.no_grad():
-                outputs = model(**batch)
+                outputs,labels = model_outputs_from_batch(batch, model, device, tokenizer)
 
             predictions = outputs.logits.argmax(dim=-1)
-            labels = batch["labels"]
-            label_list = ['no_mutation', 'mutation']
-            # true_predictions = [
-            #     [label_list[p] for (p, l) in zip(prediction, label) if l != -100]
-            #     for prediction, label in zip(predictions, labels)
-            # ]
-            # true_labels = [
-            #     [label_list[l] for (p, l) in zip(prediction, label) if l != -100]
-            #     for prediction, label in zip(predictions, labels)
-            # ]
+            # labels = batch["labels"]
+            # label_list = ['no_mutation', 'mutation']
+            # # true_predictions = [
+            # #     [label_list[p] for (p, l) in zip(prediction, label) if l != -100]
+            # #     for prediction, label in zip(predictions, labels)
+            # # ]
+            # # true_labels = [
+            # #     [label_list[l] for (p, l) in zip(prediction, label) if l != -100]
+            # #     for prediction, label in zip(predictions, labels)
+            # # ]
 
             metric.add_batch(predictions=predictions, references=labels)
         # TODO make sure I ignore start, end and padding tokens in the metric
