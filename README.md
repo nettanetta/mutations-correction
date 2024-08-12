@@ -6,7 +6,7 @@ data_handling.py has the code for creating a pytorch dataset based on fasta file
 the code is not running properly because of environment issues. but this should be the general instuctions for running the mutation detection: 
 1. You need to create a conda env based on this mutation_correction_env.yml 
 2. to run the code on the cluster, start with creating an interactive run with GPUs:
-    srun --gres=gpu:a5000 --mem=1G --pty $SHELL
+    srun --gres=gpu:a5000 --mem=8G --pty $SHELL
 3. conda activate mutation_correction_env_1
 4. module load cuda/11.8 
 5. module load nvidia
