@@ -2,8 +2,13 @@ from torch.utils.data import Dataset, DataLoader
 import torch
 from Bio import SeqIO
 import random
-MAX_LEN = 32 # TODO - change to 512
+
+
+MAX_LEN = 512
 MASK_TOKEN = 4 # [MASK] token
+PAD_TOKEN = 3 # [PAD] token
+ENDING_TOKEN = 2 # [SEP] token
+
 
 def insert_single_replacement(seq, mutation_rate):
     new_seq = []
@@ -23,12 +28,40 @@ def get_onehot_for_first_missmatch(seq1, seq2):
             return [1 if i == index else 0 for i in range(len(seq1))]
     return [0] * len(seq1)
 
+
+def pad_sequences(seq1, seq2, max_len=MAX_LEN):
+    max_len = max(len(seq1), len(seq2))
+    if seq1.shape[0] < max_len:
+        pad_vector = torch.ones(max_len - len(seq1), dtype=torch.long) * PAD_TOKEN
+        seq1 = torch.cat((seq1, pad_vector))
+
+    elif seq2.shape[0] < max_len:
+        pad_vector = torch.ones(max_len - len(seq2), dtype=torch.long) * PAD_TOKEN
+        seq2 = torch.cat((seq2, pad_vector))   
+
+    assert seq1.shape == seq2.shape
+    return seq1, seq2
+
+
 def compare_two_sequences(seq1, seq2):
     return seq1 != seq2
+
 
 def mask_sequence(seq, mask_vector):
     seq[mask_vector] = MASK_TOKEN # [MASK] token
     return seq
+
+
+def collate_fn(batch):
+    input_ids = [item['input_ids'] for item in batch]
+    labels = [item['labels'] for item in batch]
+    max_len = max([len(t) for t in input_ids])
+
+    input_ids = [torch.cat((t, torch.ones(max_len - len(t), dtype=torch.long) * PAD_TOKEN)) for t in input_ids]
+    labels = [torch.cat((t, torch.ones(max_len - len(t), dtype=torch.long) * PAD_TOKEN)) for t in labels]
+
+    return {'input_ids': torch.stack(input_ids), 'labels': torch.stack(labels)}
+
 
 class MutationDetectionDataset(Dataset):
 
@@ -43,26 +76,25 @@ class MutationDetectionDataset(Dataset):
                 x = insert_single_replacement(record_m.seq, mutation_rate=mutation_rate)
             else:
                 x = record_m.seq
-            tokenized_x = tokenization_f(str(x), padding=True, truncation=True, max_length=MAX_LEN, return_tensors='pt')['input_ids'].squeeze(0)
-            print()
-            tokenized_y = tokenization_f(str(record_t.seq), padding=True, truncation=True, max_length=MAX_LEN, return_tensors='pt')['input_ids'].squeeze(0)
+            tokenized_x = tokenization_f(str(x), padding=False, truncation=True, max_length=MAX_LEN, return_tensors='pt')['input_ids'].squeeze(0)
+            tokenized_y = tokenization_f(str(record_t.seq), padding=False, truncation=True, max_length=MAX_LEN, return_tensors='pt')['input_ids'].squeeze(0)
+            tokenized_x, tokenized_y = pad_sequences(tokenized_x, tokenized_y)
             mask_vector = compare_two_sequences(tokenized_x, tokenized_y)
             tokenized_x = mask_sequence(tokenized_x, mask_vector)
             self.sequences.append(tokenized_x)
             self.tokens_labels.append(tokenized_y)
             if verbose:
-                print(tokenized_x)
-                print(tokenized_y)
-                print(tokenized_x.shape == tokenized_y.shape)
+                print('x', tokenized_x)
+                print('y', tokenized_y)
+                # print(tokenized_x.shape == tokenized_y.shape)
                 
                 # print(tokenized_y.dtype)
-                # print(compare_two_sequences(tokenized_x, tokenized_y))
+                # print('compare', mask_vector)
                 print('----------------')
-        print(self.sequences[1].dtype)
-        print(self.tokens_labels[1].dtype)
 
     def __len__(self):
         return len(self.sequences)
 
     def __getitem__(self, idx):
-        return {'input_ids': self.sequences[idx], 'labels': self.tokens_labels[idx]}
+        assert self.sequences[idx].shape == self.tokens_labels[idx].shape
+        return {'input_ids': torch.tensor(self.sequences[idx]), 'labels': torch.tensor(self.tokens_labels[idx])}

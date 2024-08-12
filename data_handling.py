@@ -26,6 +26,8 @@ def get_one_hot_encoded_detection_labels(seqs1, seqs2):
     comparison_tensor = (seqs1['input_ids'] != seqs2['input_ids'])
     return torch.nn.functional.one_hot(comparison_tensor.long())
 
+
+
 class MutationDetectionDataset(Dataset):
 
     def __init__(self, fasta_m, fasta_t, tokenization_f, replacement_flag=False, mutation_rate=0.01, verbose=False):
