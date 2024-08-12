@@ -5,8 +5,8 @@ import random
 import data_handling_for_MLM as dhmlm
 
 MAX_LEN = 512
-#
-
+SEQ_PAD_TOKEN = 3 # [PAD] token
+SEQ_END_TOKEN = 2 #
 def insert_single_replacement(seq, mutation_rate):
     new_seq = []
     mutation_added = False
@@ -32,8 +32,14 @@ def get_iob1_labels(seqs1, seqs2):
     labels = torch.zeros_like(seqs1)
 
     begin_mask = (comparison_tensor == 1) & (torch.cat((torch.tensor([0]), comparison_tensor[:-1])) == 0)
+    in_mask = (comparison_tensor == 1) & (labels == 0)
+    special_tokens_mask = ((seqs1 == SEQ_PAD_TOKEN) & (seqs2 == SEQ_PAD_TOKEN)) | ((seqs1 == SEQ_END_TOKEN) & (seqs2 == SEQ_END_TOKEN))
+
     labels[begin_mask] = 1
-    labels[(comparison_tensor == 1) & (labels == 0)] = 2
+    labels[in_mask] = 2 # can change this to -100 if we want to ignore in labels (count each mutation once)
+    labels[special_tokens_mask] = -100
+    labels[0] = -100
+
     return labels
 
 

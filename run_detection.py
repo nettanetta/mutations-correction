@@ -7,7 +7,7 @@ from tqdm import tqdm
 from data_handling import MutationDetectionDataset
 from torch.utils.data import DataLoader
 
-BATCH_SIZE = 128
+BATCH_SIZE = 16_384
 MAX_LEN = 512
 SEQ_PAD_TOKEN = 3 # [PAD] token
 LABELS_PAD_TOKEN = 0
@@ -120,6 +120,8 @@ def run_training(train_fasta_m, train_fasta_t, validation_fasta_m, validation_fa
 
 if __name__ == "__main__":
     print(f'device is: {DEVICE}')
-    train_fasta_mutated = '/sci/backup/morani/lab/Projects/mutations_detection_temp/data/mutated_1000_seqs.fa'
-    train_fasta_true = '/sci/backup/morani/lab/Projects/mutations_detection_temp/data/orig_1000_seqs.fa'
-    run_training(train_fasta_mutated, train_fasta_true, None, None, num_epochs=1)
+    # train_fasta_mutated = '/sci/backup/morani/lab/Projects/mutations_detection_temp/data/mutated_1000_seqs.fa'
+    # train_fasta_true = '/sci/backup/morani/lab/Projects/mutations_detection_temp/data/orig_1000_seqs.fa'
+    train_fasta_mutated = '/sci/backup/morani/lab/Projects/mutations_detection_temp/data/mutated.fa'
+    train_fasta_true = '/sci/backup/morani/lab/Projects/mutations_detection_temp/data/orig.fa'
+    run_training(train_fasta_mutated, train_fasta_true, None, None, num_epochs=2)
