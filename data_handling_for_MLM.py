@@ -29,14 +29,14 @@ def get_onehot_for_first_missmatch(seq1, seq2):
     return [0] * len(seq1)
 
 
-def pad_sequences(seq1, seq2, max_len=MAX_LEN):
+def pad_sequences(seq1, seq2, max_len=MAX_LEN, pad_token=PAD_TOKEN):
     max_len = max(len(seq1), len(seq2))
     if seq1.shape[0] < max_len:
-        pad_vector = torch.ones(max_len - len(seq1), dtype=torch.long) * PAD_TOKEN
+        pad_vector = torch.ones(max_len - len(seq1), dtype=torch.long) * pad_token
         seq1 = torch.cat((seq1, pad_vector))
 
     elif seq2.shape[0] < max_len:
-        pad_vector = torch.ones(max_len - len(seq2), dtype=torch.long) * PAD_TOKEN
+        pad_vector = torch.ones(max_len - len(seq2), dtype=torch.long) * pad_token
         seq2 = torch.cat((seq2, pad_vector))   
 
     assert seq1.shape == seq2.shape
