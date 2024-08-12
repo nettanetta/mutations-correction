@@ -44,6 +44,7 @@ class MutationDetectionDataset(Dataset):
             else:
                 x = record_m.seq
             tokenized_x = tokenization_f(str(x), padding=True, truncation=True, max_length=MAX_LEN, return_tensors='pt')['input_ids'].squeeze(0)
+            print()
             tokenized_y = tokenization_f(str(record_t.seq), padding=True, truncation=True, max_length=MAX_LEN, return_tensors='pt')['input_ids'].squeeze(0)
             mask_vector = compare_two_sequences(tokenized_x, tokenized_y)
             tokenized_x = mask_sequence(tokenized_x, mask_vector)
