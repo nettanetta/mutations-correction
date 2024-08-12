@@ -51,6 +51,10 @@ def mask_sequence(seq, mask_vector):
     seq[mask_vector] = MASK_TOKEN # [MASK] token
     return seq
 
+def mask_labels(seq, mask_vector):
+    seq[~mask_vector] = -100 # ignore token
+    return seq
+
 
 def collate_fn(batch):
     input_ids = [item['input_ids'] for item in batch]
@@ -70,6 +74,7 @@ class MutationDetectionDataset(Dataset):
         zipped_fasta_lines = zip(SeqIO.parse(fasta_m, "fasta"), SeqIO.parse(fasta_t, "fasta"))
         self.sequences = []
         self.tokens_labels = []
+        self.tokens_gt = []
         self.mutations = []
         for record_m, record_t in zipped_fasta_lines:
             if replacement_flag :
@@ -82,9 +87,12 @@ class MutationDetectionDataset(Dataset):
             mask_vector = compare_two_sequences(tokenized_x, tokenized_y)
             tokenized_x = mask_sequence(tokenized_x, mask_vector)
             self.sequences.append(tokenized_x)
-            self.tokens_labels.append(tokenized_y)
+            self.tokens_gt.append(tokenized_y)
+            tokenized_labels = mask_labels(tokenized_y.clone(), mask_vector)
+            self.tokens_labels.append(tokenized_labels)
             if verbose:
                 print('x', tokenized_x)
+                print('labels_mask', tokenized_labels)
                 print('y', tokenized_y)
                 # print(tokenized_x.shape == tokenized_y.shape)
                 
@@ -97,4 +105,4 @@ class MutationDetectionDataset(Dataset):
 
     def __getitem__(self, idx):
         assert self.sequences[idx].shape == self.tokens_labels[idx].shape
-        return {'input_ids': torch.tensor(self.sequences[idx]), 'labels': torch.tensor(self.tokens_labels[idx])}
+        return {'input_ids': self.sequences[idx], 'labels': self.tokens_labels[idx]}
