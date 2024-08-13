@@ -36,7 +36,8 @@ def get_iob1_labels(seqs1, seqs2):
     special_tokens_mask = ((seqs1 == SEQ_PAD_TOKEN) & (seqs2 == SEQ_PAD_TOKEN)) | ((seqs1 == SEQ_END_TOKEN) & (seqs2 == SEQ_END_TOKEN))
 
     labels[begin_mask] = 1
-    labels[in_mask] = 2 # can change this to -100 if we want to ignore in labels (count each mutation once)
+    labels[in_mask] = 2
+    # labels[in_mask] = -100 #2 # can change this to -100 if we want to ignore in labels (count each mutation once)
     labels[special_tokens_mask] = -100
     labels[0] = -100
 
@@ -79,4 +80,4 @@ class MutationDetectionDataset(Dataset):
         return len(self.sequences)
 
     def __getitem__(self, idx):
-        return {'sequences': self.sequences[idx], 'token_labels': self.token_labels[idx]}
+        return {'input_ids': self.sequences[idx], 'labels': self.token_labels[idx]}
