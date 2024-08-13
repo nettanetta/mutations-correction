@@ -3,7 +3,8 @@ from transformers.modeling_outputs import TokenClassifierOutput
 import torch.nn as nn
 import torch
 from typing import Optional, Tuple, Union
-
+from sklearn.utils import class_weight
+import numpy as np
 class BertForTokenClassification(BertPreTrainedModel):
     """Bert Model transformer with a token classification head.
     This head is a linear layer on top of the hidden-states output.
@@ -63,8 +64,12 @@ class BertForTokenClassification(BertPreTrainedModel):
 
         loss = None
         if labels is not None:
-            # Compute loss
-            loss_fct = nn.CrossEntropyLoss()
+            # Compute weighted cross-entropy loss
+
+            class_weights = class_weight.compute_class_weight('balanced', classes=np.arange(self.num_labels), y=abels.view(-1))
+            class_weights = torch.tensor(class_weights, dtype=torch.float)
+
+            loss_fct = nn.CrossEntropyLoss(weight=class_weights)
             loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1)) # TODO do we want to keep the default mean reduction? what about masking the padding?
 
         if not return_dict:
