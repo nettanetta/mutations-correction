@@ -3,7 +3,7 @@ from transformers import AdamW, get_scheduler, AutoTokenizer
 from transformers.models.bert.configuration_bert import BertConfig
 from dnabert_for_token_classification import BertForTokenClassification
 
-from data_handling import MutationDetectionDataset, detection_collator_func,compute_metrics
+from data_handling_for_NER import MutationDetectionDataset, detection_collator_func,compute_metrics
 from transformers import TrainingArguments, Trainer
 from peft import LoraConfig, get_peft_model, get_peft_model_state_dict,PeftConfig
 import sys
