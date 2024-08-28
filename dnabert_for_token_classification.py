@@ -5,19 +5,21 @@ import torch
 from typing import Optional, Tuple, Union
 from sklearn.utils import class_weight
 import numpy as np
+
+
 class BertForTokenClassification(BertPreTrainedModel):
     """Bert Model transformer with a token classification head.
     This head is a linear layer on top of the hidden-states output.
     """
 
-    def __init__(self, config, num_labels=None):
+    def __init__(self, config, num_labels=None, weight_classes=False):
         super().__init__(config)
         if num_labels is not None:
             self.num_labels = num_labels
         else:
             self.num_labels = config.num_labels
         self.config = config
-
+        self.weight_classes = weight_classes
         self.bert = BertModel(config)
         classifier_dropout = config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         self.dropout = nn.Dropout(classifier_dropout)
@@ -27,17 +29,17 @@ class BertForTokenClassification(BertPreTrainedModel):
         self.post_init()
 
     def forward(
-        self,
-        input_ids: Optional[torch.Tensor] = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        token_type_ids: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.Tensor] = None,
-        head_mask: Optional[torch.Tensor] = None,
-        inputs_embeds: Optional[torch.Tensor] = None,
-        labels: Optional[torch.Tensor] = None,
-        output_attentions: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
+            self,
+            input_ids: Optional[torch.Tensor] = None,
+            attention_mask: Optional[torch.Tensor] = None,
+            token_type_ids: Optional[torch.Tensor] = None,
+            position_ids: Optional[torch.Tensor] = None,
+            head_mask: Optional[torch.Tensor] = None,
+            inputs_embeds: Optional[torch.Tensor] = None,
+            labels: Optional[torch.Tensor] = None,
+            output_attentions: Optional[bool] = None,
+            output_hidden_states: Optional[bool] = None,
+            return_dict: Optional[bool] = None,
     ) -> Union[Tuple[torch.Tensor], TokenClassifierOutput]:
         # labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
         # Labels for computing the token classification loss.
@@ -64,13 +66,30 @@ class BertForTokenClassification(BertPreTrainedModel):
 
         loss = None
         if labels is not None:
-            # Compute weighted cross-entropy loss
-
-            class_weights = class_weight.compute_class_weight('balanced', classes=np.arange(self.num_labels), y=abels.view(-1))
-            class_weights = torch.tensor(class_weights, dtype=torch.float)
-
-            loss_fct = nn.CrossEntropyLoss(weight=class_weights)
-            loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1)) # TODO do we want to keep the default mean reduction? what about masking the padding?
+            if self.weight_classes:
+                # Compute weighted cross-entropy loss
+                unique_labels_with_counts = torch.unique(labels.view(-1), return_counts=True)
+                labels_unique_np = unique_labels_with_counts[0].cpu().detach().numpy()
+                counts = unique_labels_with_counts[1].cpu().detach().numpy()
+                sum_without_padding = counts[labels_unique_np != 100].sum()
+                if self.weight_classes=='inverse':
+                    weights_dict = {label: (sum_without_padding / count) for count, label in
+                                    zip(counts, labels_unique_np) if label != -100}
+                elif self.weight_classes=='effective_num_of_samples':
+                    beta = 0.95
+                    weights_dict = {label: ((1-beta) / (1-beta**count)) for count, label in
+                                    zip(counts, labels_unique_np) if label != -100}
+                else:
+                    raise ValueError(f"Invalid class balancing technique: {self.weight_classes}")
+                class_weights = class_weight.compute_class_weight(weights_dict, classes=np.array(list(weights_dict)),
+                                                                  y=[max(x, 0) for x in
+                                                                     labels.cpu().detach().numpy().flatten()])
+                class_weights = torch.tensor(class_weights, dtype=torch.float).to(logits.device)
+                loss_fct = nn.CrossEntropyLoss(weight=class_weights)
+            else:
+                loss_fct = nn.CrossEntropyLoss()
+            loss = loss_fct(logits.view(-1, self.num_labels), labels.view(
+                -1))  # TODO do we want to keep the default mean reduction? what about masking the padding?
 
         if not return_dict:
             output = (logits,) + outputs[2:]
