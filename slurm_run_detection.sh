@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-#SBATCH --gres=gpu,vmem:22g
-#SBATCH --mem=16g
+#SBATCH --gres=gpu,vmem:22G
+#SBATCH --mem=16G
 #SBATCH -c 4
 #SBATCH -t 1-0
 #SBATCH --mail-user=netta.barak@mail.huji.ac.il
@@ -11,4 +11,4 @@ conda activate mutation_correction_env_1
 module load cuda/11.8
 module load nvidia
 
-python3 -u run_detection.py
+python3 -u run_detection.py $SLURM_JOB_ID
